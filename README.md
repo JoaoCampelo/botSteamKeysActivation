@@ -14,8 +14,9 @@
 # Dependencies
  - Python 2.7
  - Selenium
- - Webdriver for Firefox (This in case they use the bot as it is, if they decide to change use the webdriver of the browser of their choice.)
+ - Webdriver for Firefox ( This in case they use the bot as it is, if they decide to change use the webdriver of the browser of their choice. )
  
 # License
  MIT
+ 
  Made in Portugal
