@@ -71,7 +71,8 @@ else:
 
     """Click on the submit button to login on Steam Guard email code."""
     try:
-        WebDriverWait(driver, delay).until(EC.presence_of_element_located((By.XPATH, "//*[@id=\"auth_buttonset_entercode\"]/div[1]"))).click() 
+        WebDriverWait(driver, delay).until(EC.presence_of_element_located((By.XPATH, "//*[@id=\"auth_buttonset_entercode\"]/div[1]"))).click()
+        time.sleep(2)
     except TimeoutException:
         print "Submit Steam Guard code (Email) -> Loading the element took too much time!"
 
