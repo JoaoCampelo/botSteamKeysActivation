@@ -8,86 +8,148 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
+from selenium.webdriver.support import ui
 import time
+import pickle
 import getpass
+import sys
+import os
 
-"""These instructions would read the username, password and Steam Guard code from bash."""
+def page_loaded(driver):
+	return driver.find_element_by_tag_name("body") != None
+
+def find_element_by_xpath(driver, xpath):
+    try:
+        element = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.XPATH, xpath))
+        )
+    except TimeoutException:
+        print "Username -> Loading the element took too much time!"
+        driver.quit()
+        sys.exit(1)
+    finally:
+        return element
+
+def find_element_by_id(driver, id):
+    try:
+        element = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.ID, id))
+        )
+    except TimeoutException:
+        print "Username -> Loading the element took too much time!"
+        driver.quit()
+        sys.exit(1)
+    finally:
+        return element
+
+def xpath_element_is_displayed(driver, xpath):
+    find_element_by_xpath(driver, xpath)
+    return True
+
+def wait_until_element_is_displayed(driver, element_xpath):
+    counter = 0
+    while(True):
+        if driver.find_element_by_xpath(element_xpath).is_displayed():
+            return find_element_by_xpath(driver, element_xpath)
+        if counter > 15:
+            return False
+        
+        counter+=1
+        time.sleep(1)
+
+def login_part_two(driver, username, password):
+    driver.get("https://store.steampowered.com/login/")
+
+    inputElement = find_element_by_xpath(driver, "//*[@id=\"input_username\"]")
+    inputElement.send_keys(username)
+
+    inputElement = find_element_by_xpath(driver, "//*[@id=\"input_password\"]")
+    inputElement.send_keys(password)
+    
+    remember_login_button = find_element_by_id(driver, 'remember_login')
+    remember_login_button.click()
+    
+    login_button = find_element_by_xpath(driver, "//*[@id=\"login_btn_signin\"]/button")
+    login_button.click()
+
+def login_part_one(driver, username, password):
+    inputElement = find_element_by_xpath(driver, "//*[@id=\"input_username\"]")
+    inputElement.send_keys(username)
+
+    inputElement = find_element_by_xpath(driver, "//*[@id=\"input_password\"]")
+    inputElement.send_keys(password)
+
+    login_button = find_element_by_xpath(driver, "//*[@id=\"login_btn_signin\"]/button")
+    login_button.click()
+
+    sgCode = raw_input("Enter your Steam Guard code: ")
+
+    if driver.find_element_by_xpath("//*[@id=\"twofactorcode_entry\"]").is_displayed():
+
+        inputElement = find_element_by_xpath(driver, "//*[@id=\"twofactorcode_entry\"]")
+        inputElement.send_keys(sgCode)
+        
+        button = find_element_by_xpath(driver, "//*[@id=\"login_twofactorauth_buttonset_entercode\"]/div[1]")
+        button.click()
+    
+    else:
+        inputElement = find_element_by_xpath(driver, "//*[@id=\"authcode\"]")
+        inputElement.send_keys(sgCode)
+
+        button = find_element_by_xpath(driver, '//*[@id=\"auth_buttonset_entercode\"]/div[1]')
+        button.click()
+
+        button = wait_until_element_is_displayed(driver, "//*[@id=\"success_continue_btn\"]")
+        button.click()
+
+def login_with_cookies(driver):
+    cookies = pickle.load(open("cookies.pkl", "rb"))
+    for cookie in cookies:
+        driver.add_cookie(cookie)
+
+    driver.get("https://store.steampowered.com/account/registerkey")
+    wait = ui.WebDriverWait(driver, 10)
+    wait.until(page_loaded)
+
+    if driver.current_url == "https://store.steampowered.com/account/registerkey":
+        return True
+
+    return False
+
+def login(driver, username, password):
+    driver.get("https://store.steampowered.com/login/")
+    wait = ui.WebDriverWait(driver, 10)
+    wait.until(page_loaded)
+
+    if os.path.exists("cookies.pkl"):
+        if login_with_cookies(driver):
+            return
+    
+    login_part_one(driver, username, password)
+    driver.execute_script('Logout();')
+    wait = ui.WebDriverWait(driver, 10)
+    wait.until(page_loaded)
+
+    login_part_two(driver, username, password)
+    wait = ui.WebDriverWait(driver, 10)
+    wait.until(page_loaded)
+
+    pickle.dump( driver.get_cookies() , open("cookies.pkl","wb"))
+
+reload(sys)
+sys.setdefaultencoding('utf-8')
+
 username = raw_input("Enter your username: ")
 password = pw = getpass.getpass("Enter your password: ")
-sgCode = raw_input("Enter your Steam Guard code: ")
 
-"""Create a Firefox browser instance."""
-driver = webdriver.Firefox()
-delay = 5
+driver = webdriver.Chrome()
+login(driver, username, password)
 
-"""Open the url of Steam login."""
-driver.get("https://store.steampowered.com//login/")
+delay = 10
+driver.get("https://store.steampowered.com/account/registerkey")
+wait = ui.WebDriverWait(driver, 10)
+wait.until(page_loaded)
 
-"""Select the username text input."""
-try:
-    inputElement = WebDriverWait(driver, delay).until(EC.presence_of_element_located((By.XPATH, "//*[@id=\"input_username\"]")))
-    """Insert the username into this input."""
-    inputElement.send_keys(username)
-except TimeoutException:
-    print "Username -> Loading the element took too much time!"
-
-"""Fulfill the password."""
-try:
-    inputElement = WebDriverWait(driver, delay).until(EC.presence_of_element_located((By.XPATH, "//*[@id=\"input_password\"]")))
-    inputElement.send_keys(password)
-except TimeoutException:
-    print "Passrowd -> Loading the element took too much time!"
-
-"""Click on the submit button to login."""
-try:
-    WebDriverWait(driver, delay).until(EC.presence_of_element_located((By.XPATH, "//*[@id=\"login_btn_signin\"]/button"))).click()
-except TimeoutException:
-    print "Login Button -> Loading the element took too much time!"
-
-time.sleep(2)
-
-"""Condition to distinguish between the Steam Guard of the mobile application and the Steam Guard that sends the code by email."""
-if driver.find_element_by_xpath("//*[@id=\"twofactorcode_entry\"]").is_displayed():
-    """Fulfill the steam guard code """
-    try:
-        inputElement = WebDriverWait(driver, delay).until(EC.presence_of_element_located((By.XPATH, "//*[@id=\"twofactorcode_entry\"]")))
-        inputElement.send_keys(sgCode)
-    except TimeoutException:
-        print "Input Steam Guard (APP) -> Loading the element took too much time!"
-
-    """Click on the submit button to login on Steam Guard."""
-    try:
-        WebDriverWait(driver, delay).until(EC.presence_of_element_located((By.XPATH, "//*[@id=\"login_twofactorauth_buttonset_entercode\"]/div[1]"))).click() 
-    except TimeoutException:
-        print "Submit Steam Guard code (APP) -> Loading the element took too much time!"
-        
-else:
-    """Fulfill the steam guard email code """
-    try:
-        inputElement = WebDriverWait(driver, delay).until(EC.presence_of_element_located((By.XPATH, "//*[@id=\"authcode\"]")))
-        inputElement.send_keys(sgCode)
-    except TimeoutException:
-        print "Input Steam Guard (Email) -> Loading the element took too much time!"
-
-    """Click on the submit button to login on Steam Guard email code."""
-    try:
-        WebDriverWait(driver, delay).until(EC.presence_of_element_located((By.XPATH, "//*[@id=\"auth_buttonset_entercode\"]/div[1]"))).click()
-        time.sleep(2)
-    except TimeoutException:
-        print "Submit Steam Guard code (Email) -> Loading the element took too much time!"
-
-    """Click the button to confirm the success of the Steam Guard code sent to the email."""
-    try:
-        WebDriverWait(driver, delay).until(EC.presence_of_element_located((By.XPATH, "//*[@id=\"success_continue_btn\"]"))).click() 
-    except TimeoutException:
-        print "Confirm Steam Guard (Email) -> Loading the element took too much time!"
-
-time.sleep(5)
-
-"""Condition to redirect to the key activation page after login is done."""
-if driver.current_url == "http://store.steampowered.com/":
-    driver.get("https://store.steampowered.com/account/registerkey")
-    
 """Click on the acceptance box for the terms of the service."""
 try:
     WebDriverWait(driver, delay).until(EC.presence_of_element_located((By.XPATH, "//*[@id=\"accept_ssa\"]"))).click() 
