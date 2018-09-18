@@ -20,4 +20,4 @@
 # License
  MIT
  
- Made in Portugal
+Made with ❤️ in Portugal
